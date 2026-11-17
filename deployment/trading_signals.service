@@ -1,0 +1,22 @@
+[Unit]
+Description=AI Multi-Timeframe Trading Signal System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/ai-trading-signal-system
+EnvironmentFile=/opt/ai-trading-signal-system/.env
+ExecStart=/opt/ai-trading-signal-system/.venv/bin/python /opt/ai-trading-signal-system/main.py
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/ai-trading-signal-system/logs /opt/ai-trading-signal-system/screenshots
+
+[Install]
+WantedBy=multi-user.target
