@@ -37,7 +37,7 @@ class GeminiClient:
             raise ValueError("GEMINI_API_KEY is required")
         self.api_key = api_key
         self.config = config
-        self.model = str(config.get("model", "gemini-2.5-pro"))
+        self.model = str(config.get("model", "gemini-3.8-flash"))
         self.base = str(config.get("api_base", "https://generativelanguage.googleapis.com/v1beta")).rstrip("/")
         self.timeout = int(config.get("timeout_seconds", 90))
         self.max_retries = int(config.get("max_retries", 4))
