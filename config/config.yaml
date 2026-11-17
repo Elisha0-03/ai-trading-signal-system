@@ -1,0 +1,63 @@
+system:
+  name: "AI Multi-Timeframe Trading Signal System"
+  version: "1.0.0"
+  log_level: "INFO"
+  log_dir: "logs"
+  screenshot_dir: "screenshots"
+  screenshot_retention_days: 3
+
+# All enabled strategies analyze the same four screenshots for each instrument.
+timeframes:
+  - name: "15m"
+    tradingview_interval: "15"
+  - name: "1h"
+    tradingview_interval: "60"
+  - name: "4h"
+    tradingview_interval: "240"
+  - name: "1D"
+    tradingview_interval: "D"
+
+strategies:
+  v47_intraday:
+    enabled: true
+    name: "V47.0 Intraday"
+    prompt_file: "prompts/v47_intraday.txt"
+    description: "Intraday price-action setup, with higher-timeframe context."
+  v51_scalping:
+    enabled: true
+    name: "V51.0 Scalping"
+    prompt_file: "prompts/v51_scalping.txt"
+    description: "Short-horizon setup; prioritize immediate structure and tight invalidation."
+  v57_swing:
+    enabled: true
+    name: "V57.0 Swing"
+    prompt_file: "prompts/v57_swing.txt"
+    description: "Multi-day setup; prioritize daily and 4-hour structure."
+
+gemini:
+  model: "gemini-2.5-pro"
+  api_base: "https://generativelanguage.googleapis.com/v1beta"
+  timeout_seconds: 90
+  max_retries: 4
+  retry_base_seconds: 2
+  rate_limit_per_minute: 20
+  temperature: 0.1
+
+telegram:
+  message_delay_seconds: 3
+  send_no_entry: true
+  max_message_chars: 3900
+
+screenshot:
+  headless: true
+  window_width: 1920
+  window_height: 1080
+  chart_wait_seconds: 20
+  post_navigation_wait_seconds: 5
+  capture_chart_area_only: true
+  max_concurrent_captures: 4
+
+scheduler:
+  cycle_interval_minutes: 15
+  delay_after_close_seconds: 5
+  run_immediately: false

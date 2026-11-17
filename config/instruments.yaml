@@ -1,0 +1,81 @@
+instruments:
+  - symbol: "FX:EURUSD"
+    name: "EUR/USD"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:AUDUSD"
+    name: "AUD/USD"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:NZDUSD"
+    name: "NZD/USD"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:GBPUSD"
+    name: "GBP/USD"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:USDCHF"
+    name: "USD/CHF"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:USDCAD"
+    name: "USD/CAD"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:USDJPY"
+    name: "USD/JPY"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:AUDJPY"
+    name: "AUD/JPY"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:CADJPY"
+    name: "CAD/JPY"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:CHFJPY"
+    name: "CHF/JPY"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:EURJPY"
+    name: "EUR/JPY"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:NZDJPY"
+    name: "NZD/JPY"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:GBPJPY"
+    name: "GBP/JPY"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:EURNZD"
+    name: "EUR/NZD"
+    category: "forex"
+    enabled: true
+  - symbol: "FX:EURGBP"
+    name: "EUR/GBP"
+    category: "forex"
+    enabled: true
+  - symbol: "OANDA:XAUUSD"
+    name: "Gold (XAU/USD)"
+    category: "commodities"
+    enabled: true
+  - symbol: "TVC:USOIL"
+    name: "Crude Oil (WTI)"
+    category: "commodities"
+    enabled: true
+  - symbol: "FOREXCOM:NSXUSD"
+    name: "NASDAQ 100"
+    category: "indices"
+    enabled: true
+  - symbol: "BLACKBULL:US30"
+    name: "Dow Jones (US30)"
+    category: "indices"
+    enabled: true
+  - symbol: "BINANCE:BTCUSDT"
+    name: "Bitcoin (BTC/USDT)"
+    category: "crypto"
+    enabled: true
