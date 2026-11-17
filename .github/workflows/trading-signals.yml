@@ -2,9 +2,9 @@ name: Trading signals
 
 on:
   schedule:
-    # UTC, matching the application's 15-minute cadence. Starts are best-effort.
-    - cron: '*/15 * * * *'
-  workflow_dispatch:
+    # UTC; 02:17, 10:17, 18:17 WAT. Five requests x three cycles = 15/day.
+    # No manual dispatch: avoid spending free quota on accidental test runs.
+    - cron: '17 1,9,17 * * *'
 
 permissions:
   contents: read
