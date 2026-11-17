@@ -92,7 +92,7 @@ It schedules **one cycle every 15 minutes** using `*/15 * * * *` (UTC), and also
 ### Finish setup
 
 1. Open the repository's **Settings → Secrets and variables → Actions → New repository secret**. Add these three secrets (not variables or source files):
-   - `GEMINI_API_KEY`: your Google AI API key with access to the configured model (`gemini-2.5-pro` by default).
+   - `GEMINI_API_KEY`: your Google AI API key with access to the configured model (`gemini-3.8-flash` by default).
    - `TELEGRAM_BOT_TOKEN`: your Telegram bot token from **@BotFather**.
    - `TELEGRAM_CHAT_ID`: your numeric Telegram destination chat ID. Start the bot in Telegram first; for a group, add the bot and permit it to send messages. For a channel, grant the necessary posting permission.
 2. Review model quota/cost and the enabled instruments. A full cycle can make up to **60 Gemini analyses and 20 Telegram digests**; this repeats at each scheduled cycle.
