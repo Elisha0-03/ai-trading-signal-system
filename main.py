@@ -15,7 +15,7 @@ from src.config import (
     prompt_for,
     required_credentials,
 )
-from src.gemini_client import GeminiClient
+from src.gemini_client import GeminiClient, GeminiQuotaError, GeminiRequestBudgetError
 from src.scheduler import run_forever
 from src.screenshot_capture import capture_cycle
 from src.signal_processor import format_instrument_message, parse_signal
@@ -95,6 +95,9 @@ def run_cycle(settings: dict[str, Any], no_telegram: bool = False) -> None:
                 completed += 1
                 log.info("Validated %s %s: %s (%s)", symbol, strategy.get("name", strategy_key),
                          signal.direction, signal.confidence)
+            except (GeminiQuotaError, GeminiRequestBudgetError):
+                log.error("Free-tier limit reached: aborting cycle without further analysis or delivery")
+                raise
             except Exception:
                 log.exception("Analysis failed for %s strategy %s", symbol, strategy_key)
 
@@ -132,6 +135,9 @@ def dry_run(settings: dict[str, Any]) -> int:
     print(f"Expected screenshots per cycle: {screenshots}")
     print(f"Enabled strategies: {', '.join(x.get('name', key) for key, x in enabled_strategies(settings).items())}")
     print(f"Expected independent analyses per cycle: {analyses}")
+    cycles = 1440 // int(settings["scheduler"]["cycle_interval_minutes"])
+    print(f"Scheduled cycles per day: {cycles}; maximum scheduled Gemini requests: {analyses * cycles}/20")
+    print("Free-tier policy: no automatic retries, no paid fallback; abort cycle on HTTP 429.")
     print("Live credentials present: " + ("yes" if not missing else "no; missing " + ", ".join(sorted(missing))))
     print("Dry run performs no browser, AI API, Telegram, or trading activity.")
     return 0

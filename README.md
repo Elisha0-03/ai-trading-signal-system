@@ -1,127 +1,81 @@
 # AI Multi-Timeframe Trading Signal System
 
-A signal-only Python application that captures TradingView chart views, sends four labeled timeframes to Google Gemini for three independent strategy analyses, validates the returned prices, and delivers a Telegram digest per instrument. It does **not** place orders, connect to a broker, or install trading indicators.
+A signal-only Python application that captures TradingView charts, asks Gemini to analyze them, validates the returned levels, and delivers a Telegram digest. It does **not** place orders or connect to a broker. AI signals can be wrong; review them independently. This is not investment advice.
 
-## Security note about the uploaded source
+## Paused, adapted for Gemini Free tier
 
-The uploaded ZIP contained Python entrypoints and modules whose visible contents were encrypted payloads passed to `exec`, with anti-debug checks. That code was not executed or trusted. This folder is a clean, readable replacement built from the accompanying PDF requirements; the original ZIP is left untouched. Review this source before configuring credentials.
+The GitHub Actions workflow was manually disabled during the free-quota adaptation and is intentionally left disabled. Configuration in source does not re-enable a disabled workflow. The existing Gemini API key, Telegram token, and chat ID have not been replaced or removed.
 
-## What a cycle does
+The first live run encountered a **20-request-per-day Free-tier limit** and produced no Telegram signals. The old configuration planned 60 independent analyses every 15 minutes, before retries. The new workload is deliberately much smaller:
 
-- Reads 20 enabled instruments and four shared chart intervals (`15m`, `1h`, `4h`, `1D`): 80 chart captures.
-- Runs each enabled strategy independently for each instrument: 60 expected Gemini analyses (20 × 3).
-- Uses three editable prompt files: V47.0 Intraday, V51.0 Scalping, and V57.0 Swing.
-- Rejects malformed model output and BUY/SELL levels whose entry, stop, and target are ordered inconsistently. `NO_ENTRY` is permitted and is sent by default.
-- Sends one Telegram digest per instrument, containing each enabled strategy's result.
+| Setting | Free-tier configuration |
+| --- | --- |
+| Enabled instruments | EUR/USD, GBP/USD, USD/JPY, Gold (XAU/USD), Bitcoin (BTC/USDT) |
+| Strategy | V57.0 Swing only |
+| Chart timeframes | `15m`, `1h`, `4h`, `1D`, bundled into one Gemini request per instrument |
+| Per cycle | 20 chart captures, at most 5 Gemini requests, up to 5 instrument digests |
+| Schedule | `17 1,9,17 * * *` UTC: 01:17, 09:17, 17:17 |
+| Nigeria time (WAT, UTC+1) | 02:17, 10:17, 18:17 daily |
+| Scheduled daily maximum | **15 Gemini requests**, leaving 5 of the observed 20-request quota unused |
+| Request pacing | At most 4 requests per minute; no automatic retries |
 
-The scheduler starts each cycle five seconds after a UTC 15-minute boundary by default. Screenshot capture uses a bounded pool of four independent browser workers by default (`screenshot.max_concurrent_captures`). A large batch still spans a period, so it is not a synchronized snapshot and screenshots are not guaranteed to occur at the exact close of each instrument/timeframe candle. Confirm whether this timing is sufficient for your use. TradingView may show a consent banner, login gate, CAPTCHA, rate limit, or unavailable symbol; such captures are logged and an incomplete MTF set is skipped rather than analyzed.
+Swing analysis suits this slower cadence better than scalping. The other 15 instruments and both other strategies are retained but disabled, not deleted. All three prompt files remain editable. `NO_ENTRY` digests are still enabled. Missing/incomplete chart sets are skipped and can reduce actual requests and messages.
 
-Generated screenshot cycle folders older than the configured retention period (three days by default) are removed at the start of a cycle.
+### Quota and cost safeguards
 
-## Requirements
+- Configuration validation rejects workload above 5 analyses per cycle or the configured 15-request scheduled daily budget. It rejects retries, startup runs, and paid-mode policy settings.
+- The Gemini client counts HTTP attempts **before** posting, including failed/ambiguous calls, and refuses a sixth request in a cycle.
+- HTTP 429 stops the entire cycle immediately without retry, model switching, or paid fallback; the one-cycle process exits unsuccessfully rather than claiming a successful cycle. Earlier digests, if any, cannot be unsent.
+- Other failed requests are not retried under the committed configuration.
+- There is deliberately **no manual `workflow_dispatch` button**. Scheduled runs use `--once`, not the perpetual scheduler. Concurrency prevents overlap.
+- No paid Google plan, billing account, paid model fallback, or paid runner is enabled by this project/change. `usage_tier: free` and `allow_paid: false` are local workload policy, **not** a Google billing API control. Keep the existing Google project on Free tier; enabling billing there can change charging behavior.
 
-- Python 3.10 or newer
-- Google Chrome or Chromium installed on the machine running the service (Selenium Manager obtains a compatible driver when possible)
-- A Gemini API key with access to the configured model
-- A Telegram bot token and target chat ID
-- Network access to TradingView, Google AI, and Telegram
+The 15/day limit is the normal configured schedule, **not a durable cross-run quota ledger**. GitHub run replays, direct local `--once` invocations, a second deployment, and other applications sharing the Google project's quota can exceed it. Do not run copies concurrently or re-run jobs to test. Account/model quotas, token/image limits, and availability can change; the five-request headroom is not reserved and does not guarantee every request succeeds. The configured `gemini-3.8-flash` model and API key are unchanged; no model-access probe was made during adaptation.
 
-API usage, model availability, and quotas depend on your Google account and can change. The default Gemini model and request pacing are configurable in `config/config.yaml`. A live cycle can use up to 60 Gemini requests; check your account's model access, quota, and any charges before running it.
+## Safely resume later
 
-## Install and configure
+1. Leave **Actions → Trading signals** disabled until the Gemini daily quota has reset after the earlier failed run. Since a fresh quota reset was not checked, a conservative option is to wait at least 24 hours after the last attempted live request, then confirm available quota in Google AI Studio. Keep the project on **Free tier**, with no paid billing upgrade.
+2. Confirm the public `main` branch contains this free-tier change. Keep the three existing repository **secrets** (`GEMINI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) unchanged. Do not paste them into source, logs, or repository variables.
+3. Ensure this workflow is the **only** deployment using this workload/key and no other app is exhausting its project quota. Check that it still enables only the five instruments and swing strategy.
+4. Optionally run the **offline** checks below. Do not run `--once`, use **Re-run jobs**, or start the systemd service as a test.
+5. On the [Trading signals workflow page](https://github.com/Elisha0-03/ai-trading-signal-system/actions/workflows/trading-signals.yml), click **Enable workflow** once. Wait for the next scheduled slot; this enables future live analysis and Telegram delivery, not an immediate validation run.
+6. Inspect that next scheduled run's logs for validated analysis counts and Telegram delivery errors. A green job alone does not prove every signal was delivered: chart, parsing, and Telegram errors may skip individual results. A 429 is now a failed cycle; disable the workflow and inspect quota instead of replaying it.
 
-From this directory on Linux:
+To pause again: **Actions → Trading signals → Workflow options → Disable workflow**. Removing a secret is unnecessary. A source commit does not automatically resume a manually disabled workflow.
+
+## Install and test offline
+
+Requirements: Python 3.10+, Chrome/Chromium for live screenshot capture, and dependencies in `requirements.txt`.
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install --upgrade pip
 pip install -r requirements.txt
-cp .env.example .env
-```
-
-Edit `.env` with the three values:
-
-```dotenv
-GEMINI_API_KEY=...
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
-```
-
-Keep `.env` private and do not commit it. The application sends credentials only to the configured Google API and Telegram Bot API endpoints; they are not written to logs.
-
-## Test without network or credentials
-
-```bash
-python main.py --dry-run
 python -m unittest discover -s tests -v
+python main.py --dry-run
 ```
 
-The dry run validates configuration and prints the expected scale without opening a browser or making API calls. The unit tests cover counts, JSON parsing, signal-level validation, message formatting, and scheduling. These tests do not establish TradingView availability, Gemini model access, Telegram delivery, signal accuracy, or VPS readiness.
+The dry run validates configuration and prints the 20 captures/5 analyses per cycle and 15 scheduled requests/day without browser, Gemini, Telegram, or trading activity. Unit tests use fake keys and mocked external operations. These checks do **not** establish model access, TradingView availability, successful Telegram delivery, or signal accuracy. No live cycle or Telegram test was run for this adaptation.
 
-## Run live
+For a separately reviewed deployment, copy `.env.example` to `.env` and populate its required values privately. The GitHub workflow uses repository secrets instead. `.env`, screenshots, and logs are ignored by Git. Before any live work, a missing/blank required secret fails closed; the workflow's credential guard runs before checkout/install/capture/API calls.
 
-A single live cycle immediately captures charts, calls Gemini, and sends Telegram messages:
+## Files and execution behavior
 
-```bash
-python main.py --once
-```
+- `config/config.yaml`: strategies, model, request caps/pacing, chart options, Telegram behavior, internal schedule.
+- `config/instruments.yaml`: all 20 original symbols; only the five above are enabled. Verify each TradingView symbol/provider before live use.
+- `prompts/*.txt`: V47.0 Intraday, V51.0 Scalping, V57.0 Swing prompts. Retain JSON keys and valid BUY/SELL price ordering.
+- `.github/workflows/trading-signals.yml`: three daily UTC slots; secrets are passed only to the credential guard and live-cycle step. It runs offline tests before any live cycle. Public code and Actions logs remain publicly visible; never print credentials.
 
-This can consume API quota or incur charges and will send messages to the configured chat. `--once --no-telegram` skips Telegram delivery but still makes Gemini API calls. For continuous operation, run:
+Four independent browser workers capture chart sets. Screenshot cycle folders older than three days are removed. Charts are not synchronized candle-close snapshots; TradingView may display consent/login/CAPTCHA/rate limits or unavailable symbols. An incomplete multi-timeframe set is skipped rather than analyzed.
 
-```bash
-python main.py
-```
+The internal Python scheduler is aligned every 480 minutes with a 4,620-second offset from UTC eight-hour boundaries, matching the three nominal GitHub times; `run_immediately` is false. It is an **alternative** to GitHub, not an additional deployment. `python main.py --once` starts live work immediately and can send Telegram messages; `--no-telegram` still consumes Gemini quota. Do not use either as an offline test.
 
-The scheduler follows UTC boundaries. Set `scheduler.run_immediately: true` only if you want a cycle at startup as well. The main loop logs failures and remains alive; systemd can restart the process after an exit.
+GitHub-hosted execution is best effort, not an always-on server or interactive Telegram bot. Queue/setup time shifts actual capture time; scheduled jobs can be delayed/dropped. The 45-minute timeout can leave partial output. Public-repository schedules can be disabled after 60 days of inactivity. Fresh runners discard local screenshots/logs after a job; consult Actions logs. Standard public-repository runners are used, with no paid runner, persistent VPS, caches, or artifact uploads configured. See [GitHub scheduling behavior](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule).
 
-## Configuration
+`deployment/trading_signals.service` remains an unactivated optional systemd template. Do not enable it while GitHub is active; this project has not been deployed to or tested on a VPS.
 
-- `config/config.yaml`: intervals, strategies, prompts, model, rate pacing, screenshot options, Telegram behavior, scheduler timing.
-- `config/instruments.yaml`: instrument symbols, names, categories, and enabled flags. The current 20 symbols are copied from the uploaded configuration; verify each symbol/provider on TradingView before a live cycle.
-- `prompts/*.txt`: editable analysis instructions. Keep the JSON response keys and price-order rules intact unless you also update `src/signal_processor.py`.
+## Source and safety notes
 
-Disable a strategy by setting its `enabled` field to `false`. To limit a strategy to selected instruments, add a `strategies: [v47_intraday, ...]` list to those instrument entries; if omitted, all enabled strategies apply.
+The original uploaded ZIP contained encrypted Python payloads passed to `exec` with anti-debug checks. Those payloads were not executed or trusted. This repository is a clean, readable replacement, built from the accompanying requirements; the original upload was left untouched.
 
-## Free hobby deployment: GitHub Actions
-
-The workflow in `.github/workflows/trading-signals.yml` uses a standard `ubuntu-latest` GitHub-hosted runner in a **public repository**. [Standard runners are free for public repositories](https://docs.github.com/billing/managing-billing-for-github-actions/about-billing-for-github-actions); Gemini access and quota are separate and are not made free by this deployment. No paid runner, persistent VPS, cache, or artifact uploads are configured.
-
-It schedules **one cycle every 15 minutes** using `*/15 * * * *` (UTC), and also offers an explicit manual run. It runs `python main.py --once`, not the perpetual scheduler. A concurrency group prevents overlapping cycles without cancelling a running one; only one pending cycle is kept by GitHub, so a backlog does not replay every missed interval. A job has a 45-minute maximum runtime and a timeout can leave a cycle only partially delivered.
-
-### Finish setup
-
-1. Open the repository's **Settings → Secrets and variables → Actions → New repository secret**. Add these three secrets (not variables or source files):
-   - `GEMINI_API_KEY`: your Google AI API key with access to the configured model (`gemini-3.8-flash` by default).
-   - `TELEGRAM_BOT_TOKEN`: your Telegram bot token from **@BotFather**.
-   - `TELEGRAM_CHAT_ID`: your numeric Telegram destination chat ID. Start the bot in Telegram first; for a group, add the bot and permit it to send messages. For a channel, grant the necessary posting permission.
-2. Review model quota/cost and the enabled instruments. A full cycle can make up to **60 Gemini analyses and 20 Telegram digests**; this repeats at each scheduled cycle.
-3. Check the repository's **Actions** tab and enable workflows if GitHub asks. The workflow must be on the default branch (`main`). Once all three secrets are saved, the **next scheduled run is live**—there is no additional activation switch.
-4. If you want to test immediately after configuring all secrets, choose **Actions → Trading signals → Run workflow → main → Run workflow**. This makes live Gemini calls and sends Telegram messages. Do not manually rerun a partially delivered cycle unless duplicate messages are acceptable.
-5. Inspect the run's **Run exactly one live cycle** log for capture failures, validated analysis counts, and Telegram delivery failures. A completed job alone does not prove all instruments reached Telegram, since individual capture, analysis, and delivery errors are logged and skipped by the app.
-
-Before all three secrets are present and nonblank, the first workflow step **fails closed** with missing secret names only. It does not check out code, install dependencies, open a chart, call Gemini, or send Telegram messages. Workflow secrets are passed only to the guard and live-cycle steps; do not print them. `.env`, screenshots, and runtime logs are excluded from source. Public repository code and Actions logs are visible to others; review code changes before running them with secrets.
-
-### Timing and operating limits
-
-This is best-effort scheduled execution, **not an always-on VPS** and not an interactive Telegram command bot. Telegram is the output destination; no polling or webhook server is started. The internal five-second candle-boundary delay does not apply to `--once`: GitHub queue/setup time determines when capture actually starts. [GitHub documents](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule) that scheduled jobs can be delayed or dropped under load and public-repository schedules are disabled after **60 days without repository activity**. Re-enable from the Actions tab after inactivity; no artificial keep-alive commits are included. Fresh runners discard local screenshots and logs at the end of a job; use the Actions console for diagnostics.
-
-To pause delivery, go to **Actions → Trading signals → ⋯ → Disable workflow**. Removing any required secret also stops future runs before live work. This deployment has not yet been verified with live credentials, Gemini responses, or Telegram delivery.
-
-## VPS deployment
-
-A systemd unit template is in `deployment/trading_signals.service`. Copy this project to `/opt/ai-trading-signal-system`, install its dependencies and Chrome, create and populate `/opt/ai-trading-signal-system/.env`, then install the unit:
-
-```bash
-sudo cp deployment/trading_signals.service /etc/systemd/system/trading_signals.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now trading_signals
-sudo systemctl status trading_signals
-journalctl -u trading_signals -f
-```
-
-The unit runs as the `ubuntu` account by default; adjust `User`, `Group`, and paths for your VPS. Do not enable the service until Chrome, configuration, network access, and credentials are ready. This project has not been deployed to or tested on a VPS.
-
-## Limitations and safety
-
-Chart images may omit details or render differently by symbol, viewport, browser, region, and TradingView access state. AI-generated levels can be wrong; confidence labels are not calibrated probabilities and do not imply a win rate. Review every result independently and use your own risk controls. This is not investment advice. The application is signal-only and contains no broker integration or trade execution code.
+Model confidence is not a calibrated probability or win rate. Chart rendering and model output can be incomplete or incorrect. Price-order validation rejects malformed BUY/SELL levels but cannot establish that a trade is safe or profitable. There is no broker integration or order execution code.
