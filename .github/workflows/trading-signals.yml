@@ -1,0 +1,69 @@
+name: Trading signals
+
+on:
+  schedule:
+    # UTC, matching the application's 15-minute cadence. Starts are best-effort.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trading-signals
+  cancel-in-progress: false
+
+jobs:
+  signal-cycle:
+    name: One signal cycle
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Require all credentials before any live work
+        shell: bash
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in GEMINI_API_KEY TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID; do
+            value="${!name}"
+            if [[ -z "${value//[[:space:]]/}" ]]; then
+              echo "::error::Missing required repository secret: ${name}. No live cycle will run."
+              missing=1
+            fi
+          done
+          if [[ "$missing" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Check out clean source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Confirm browser is available
+        run: google-chrome --version
+
+      - name: Run offline tests and validate configuration
+        run: |
+          python -m unittest discover -s tests -v
+          python main.py --dry-run
+
+      - name: Run exactly one live cycle
+        env:
+          PYTHONUNBUFFERED: '1'
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py --once
