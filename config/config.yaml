@@ -6,7 +6,7 @@ system:
   screenshot_dir: "screenshots"
   screenshot_retention_days: 3
 
-# All enabled strategies analyze the same four screenshots for each instrument.
+# Each swing analysis uses all four labeled chart screenshots in ONE request.
 timeframes:
   - name: "15m"
     tradingview_interval: "15"
@@ -19,12 +19,12 @@ timeframes:
 
 strategies:
   v47_intraday:
-    enabled: true
+    enabled: false
     name: "V47.0 Intraday"
     prompt_file: "prompts/v47_intraday.txt"
     description: "Intraday price-action setup, with higher-timeframe context."
   v51_scalping:
-    enabled: true
+    enabled: false
     name: "V51.0 Scalping"
     prompt_file: "prompts/v51_scalping.txt"
     description: "Short-horizon setup; prioritize immediate structure and tight invalidation."
@@ -38,9 +38,14 @@ gemini:
   model: "gemini-3.8-flash"
   api_base: "https://generativelanguage.googleapis.com/v1beta"
   timeout_seconds: 90
-  max_retries: 4
+  # Local workload policy only; cannot change Google project billing settings.
+  usage_tier: "free"
+  allow_paid: false
+  max_requests_per_cycle: 5
+  daily_request_budget: 15
+  max_retries: 0
   retry_base_seconds: 2
-  rate_limit_per_minute: 20
+  rate_limit_per_minute: 4
   temperature: 0.1
 
 telegram:
@@ -58,6 +63,7 @@ screenshot:
   max_concurrent_captures: 4
 
 scheduler:
-  cycle_interval_minutes: 15
-  delay_after_close_seconds: 5
+  cycle_interval_minutes: 480
+  # Offset from eight-hour UTC boundaries: 01:17, 09:17, 17:17 UTC.
+  delay_after_close_seconds: 4620
   run_immediately: false
