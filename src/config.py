@@ -76,6 +76,24 @@ def _validate(settings: dict[str, Any]) -> None:
         raise ConfigurationError("gemini.rate_limit_per_minute must be a positive integer")
     if int(settings.get("scheduler", {}).get("cycle_interval_minutes", 0)) <= 0:
         raise ConfigurationError("scheduler.cycle_interval_minutes must be positive")
+    if gemini.get("usage_tier") != "free" or gemini.get("allow_paid") is not False:
+        raise ConfigurationError("Only the free usage tier is permitted; allow_paid must be false")
+    if int(gemini.get("max_retries", -1)) != 0:
+        raise ConfigurationError("Free-tier max_retries must be zero")
+    cap = int(gemini.get("max_requests_per_cycle", 0))
+    budget = int(gemini.get("daily_request_budget", 0))
+    if not 0 < cap <= budget < 20:
+        raise ConfigurationError("Request limits must satisfy 0 < per-cycle cap <= daily budget < 20")
+    analyses = sum(
+        1 for instrument in enabled_instruments(settings) for strategy in enabled_strategies(settings)
+        if instrument.get("strategies") is None or strategy in instrument["strategies"]
+    )
+    interval = int(settings["scheduler"]["cycle_interval_minutes"])
+    if interval > 1440 or 1440 % interval or analyses == 0 or analyses > cap or analyses * (1440 // interval) > budget:
+        raise ConfigurationError("Configured workload exceeds the free daily budget or per-cycle cap")
+    delay = int(settings["scheduler"].get("delay_after_close_seconds", 0))
+    if not 0 <= delay < interval * 60 or settings["scheduler"].get("run_immediately", False):
+        raise ConfigurationError("Free-tier scheduler requires a bounded delay and run_immediately false")
 
 
 def enabled_instruments(settings: dict[str, Any]) -> list[dict[str, Any]]:

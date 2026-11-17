@@ -14,6 +14,14 @@ import requests
 log = logging.getLogger(__name__)
 
 
+class GeminiQuotaError(RuntimeError):
+    """Quota/rate limit: stop this cycle without retries or model fallback."""
+
+
+class GeminiRequestBudgetError(RuntimeError):
+    """The cycle has already attempted its maximum allowed requests."""
+
+
 class RateGate:
     def __init__(self, requests_per_minute: int):
         if requests_per_minute <= 0:
@@ -40,9 +48,11 @@ class GeminiClient:
         self.model = str(config.get("model", "gemini-3.8-flash"))
         self.base = str(config.get("api_base", "https://generativelanguage.googleapis.com/v1beta")).rstrip("/")
         self.timeout = int(config.get("timeout_seconds", 90))
-        self.max_retries = int(config.get("max_retries", 4))
+        self.max_retries = int(config.get("max_retries", 0))
+        self.max_requests_per_cycle = int(config.get("max_requests_per_cycle", 5))
+        self.requests_attempted = 0
         self.retry_base = float(config.get("retry_base_seconds", 2))
-        self.gate = RateGate(int(config.get("rate_limit_per_minute", 20)))
+        self.gate = RateGate(int(config.get("rate_limit_per_minute", 4)))
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json", "x-goog-api-key": api_key})
 
@@ -65,10 +75,16 @@ class GeminiClient:
         }
         url = f"{self.base}/models/{self.model}:generateContent"
         for attempt in range(self.max_retries + 1):
+            if self.requests_attempted >= self.max_requests_per_cycle:
+                raise GeminiRequestBudgetError("Per-cycle Gemini request cap reached; no further requests permitted")
             self.gate.wait()
             try:
+                # Count BEFORE posting: failed/ambiguous attempts also consume the budget.
+                self.requests_attempted += 1
                 response = self.session.post(url, json=body, timeout=self.timeout)
-                if response.status_code == 429 or response.status_code >= 500:
+                if response.status_code == 429:
+                    raise GeminiQuotaError("Gemini HTTP 429: stopping cycle; no retry or paid fallback")
+                if response.status_code >= 500:
                     if attempt < self.max_retries:
                         retry_after = response.headers.get("Retry-After")
                         delay = float(retry_after) if retry_after and retry_after.isdigit() else self.retry_base * (2 ** attempt)
