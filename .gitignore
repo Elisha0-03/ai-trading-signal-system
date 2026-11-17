@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+service-account*.json
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+logs/*
+!logs/.gitkeep
+screenshots/*
+!screenshots/.gitkeep
