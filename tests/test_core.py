@@ -14,14 +14,16 @@ from src.screenshot_capture import cleanup_old_cycles
 class ConfigTests(unittest.TestCase):
     def test_brief_scale_is_configured(self):
         settings = load_settings()
-        self.assertEqual(len(enabled_instruments(settings)), 20)
+        self.assertEqual(len(settings["instruments"]), 20)
+        self.assertEqual(len(enabled_instruments(settings)), 5)
         self.assertEqual(len(settings["timeframes"]), 4)
-        self.assertEqual(len(enabled_strategies(settings)), 3)
+        self.assertEqual(len(settings["strategies"]), 3)
+        self.assertEqual(list(enabled_strategies(settings)), ["v57_swing"])
 
     def test_counts_match_requested_cycle(self):
         settings = load_settings()
-        self.assertEqual(len(enabled_instruments(settings)) * len(settings["timeframes"]), 80)
-        self.assertEqual(len(enabled_instruments(settings)) * len(enabled_strategies(settings)), 60)
+        self.assertEqual(len(enabled_instruments(settings)) * len(settings["timeframes"]), 20)
+        self.assertEqual(len(enabled_instruments(settings)) * len(enabled_strategies(settings)), 5)
 
 
 class SignalTests(unittest.TestCase):
